@@ -303,12 +303,16 @@ func (e *Event) ignoreLinux(mask uint32) bool {
 		return true
 	}
 
-	// If the event is not a DELETE or RENAME, the file must exist.
+	// If the event is MODIFY or CREATE, the file must exist.
 	// Otherwise the event is ignored.
 	// *Note*: this was put in place because it was seen that a MODIFY
 	// event was sent after the DELETE. This ignores that MODIFY and
 	// assumes a DELETE will come or has come if the file doesn't exist.
-	if !(e.Op&Remove == Remove || e.Op&Rename == Rename) {
+	// A CHMOD event (triggered by IN_MODIFY) can arrive when an open file is
+	// deleted.  In that case the DELETE event is deferred until all open
+	// handles for the file are closed. See
+	// https://github.com/fsnotify/fsnotify/issues/194 for more information.
+	if e.Op&Create == Create || e.Op&Write == Write {
 		_, statErr := os.Lstat(e.Name)
 		return os.IsNotExist(statErr)
 	}
